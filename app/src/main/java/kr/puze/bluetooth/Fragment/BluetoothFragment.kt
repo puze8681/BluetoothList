@@ -12,6 +12,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
+import android.os.ParcelUuid
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -88,13 +89,28 @@ class BluetoothFragment : Fragment() {
             // 페어링 된 블루투스 장치의 이름 목록 작성
             var paring: Vector<Paired> = Vector()
             for (device: BluetoothDevice in mDevices){
-                paring.add(Paired(device.name, device.address, device.uuids.toString()))
+                Log.d("LOGTAG", device.toString())
+                Log.d("LOGTAG", device.name)
+                Log.d("LOGTAG", device.address)
+                if(device.uuids != null){
+                    if(device.uuids.isNotEmpty()){
+                        for (uuid : ParcelUuid in device.uuids) {
+                            Log.d("LOGTAG", "UUID: " + uuid.uuid.toString())
+                        }
+                        paring.add(Paired(device.name, device.address, device.uuids[0].uuid.toString()))
+                    }else{
+                        paring.add(Paired(device.name, device.address,"null"))
+                    }
+                } else{
+                    paring.add(Paired(device.name, device.address,"null"))
+                }
+
                 pairedAdapter = PairedAdapter(paring, layoutInflater)
-                view.list_bluetooth.adapter = beaconAdapter
-                view.list_bluetooth.onItemClickListener = OnItemClickListener { parent, view, position, id ->
+                view.list_paring.adapter = pairedAdapter
+                view.list_paring.onItemClickListener = OnItemClickListener { parent, view, position, id ->
                     connectToSelectedDevice(paring[position].name)
                 }
-                beaconAdapter.notifyDataSetChanged()
+                pairedAdapter.notifyDataSetChanged()
             }
         }
     }
@@ -150,7 +166,7 @@ class BluetoothFragment : Fragment() {
                     if(bytesAvailable > 0){
                         var packetBytes = ByteArray(bytesAvailable)
                         mInputStream.read(packetBytes)
-                        for(i in 0..bytesAvailable){
+                        for(i in 0 until bytesAvailable){
                             var b = packetBytes[i]
                             var a = "123"
                             a += b
