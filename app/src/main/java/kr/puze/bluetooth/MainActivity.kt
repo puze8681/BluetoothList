@@ -77,11 +77,6 @@ class MainActivity : AppCompatActivity() {
         viewPager?.currentItem = index
     }
 
-    fun changeBackground(data: Int){
-        DetectFragment.data = data
-        goPage(2)
-    }
-
     private fun initTabLayout() {
         tab_layout_main.getTabAt(0)?.setIcon(R.mipmap.ic_launcher)
         tab_layout_main.getTabAt(1)?.setIcon(R.mipmap.ic_launcher)

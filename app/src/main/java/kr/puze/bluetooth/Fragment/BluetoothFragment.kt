@@ -30,6 +30,7 @@ import java.io.OutputStream
 import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.collections.ArrayList
 
 
 class BluetoothFragment : Fragment() {
@@ -50,6 +51,7 @@ class BluetoothFragment : Fragment() {
     lateinit var mInputStream: InputStream
     lateinit var mWorkerThread: Thread
     var simpleDateFormat = SimpleDateFormat("HH:mm:ss", Locale.KOREAN)
+    var result: String = ""
 
     @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
@@ -156,36 +158,31 @@ class BluetoothFragment : Fragment() {
     fun beginListenForData(){
         var handler = Handler()
 
-        var readBuffer = ByteArray(1024) ;  //  수신 버퍼
-        var readBufferPositon = 0;        //   버퍼 내 수신 문자 저장 위치
-
         mWorkerThread = Thread(Runnable {
             while (!Thread.currentThread().isInterrupted){
                 try {
                     var bytesAvailable = mInputStream.available()
                     if(bytesAvailable > 0){
+                        Log.d("LOGTAG", "bytesAvailable = $bytesAvailable")
                         var packetBytes = ByteArray(bytesAvailable)
                         mInputStream.read(packetBytes)
+                        Log.d("LOGTAG", "packetBytes = $packetBytes")
                         for(i in 0 until bytesAvailable){
                             var b = packetBytes[i]
-                            var a = "123"
-                            a += b
-                            if(b.equals('x')){
-                                var encodedBytes = ByteArray(readBufferPositon)
-                                System.arraycopy(readBuffer,0,encodedBytes,0,encodedBytes.size)
-                                var data = String(encodedBytes, Charset.forName("US-ASCII"))
-                                readBufferPositon = 0
-                                var result = 0
-                                for (i in readBuffer.indices) {
-                                    result = result or (readBuffer[i].toInt() shl 8 * i)
+                            if(b.toInt() == 120){
+                                Log.d("LOGTAG", "b가 120이래요!")
+                                if(result != ""){
+                                    handler.post(Runnable {
+                                        Toast.makeText(this.activity!!, result, Toast.LENGTH_SHORT).show()
+                                        DetectFragment().changeView(null, result.toInt())
+                                        result = ""
+                                        //데이터가 수신되면 할 것
+                                    })
                                 }
-                                handler.post(Runnable {
-                                    Toast.makeText(this.activity!!, data, Toast.LENGTH_SHORT).show()
-                                    Toast.makeText(this.activity!!, result.toString(), Toast.LENGTH_SHORT).show()
-                                    //데이터가 수신되면 할 것
-                                })
                             }else{
-                                readBuffer[readBufferPositon++] = b
+                                var numB = b.toInt() - 48
+                                result += numB.toString()
+                                Log.d("LOGTAG", "index = $i / b = $b / numB = $numB / result = $result")
                             }
                         }
                     }
@@ -205,16 +202,6 @@ class BluetoothFragment : Fragment() {
                 super.onScanResult(callbackType, result)
                 try {
                     val scanRecord = result.scanRecord
-                    Log.d(
-                        "getTxPowerLevel()",
-                        scanRecord!!.txPowerLevel.toString() + ""
-                    )
-                    result.device
-                    Log.d(
-                        "onScanResult()",
-                        result.device.address.toString() + "\n" + result.rssi + "\n" + result.device.name
-                                + "\n" + result.device.bondState + "\n" + result.device.type
-                    )
                     activity!!.runOnUiThread {
                         beacon.add(Beacon(result.device.address, result.rssi, simpleDateFormat.format(Date()), result.device))
                         beaconAdapter = BeaconAdapter(beacon, layoutInflater)
