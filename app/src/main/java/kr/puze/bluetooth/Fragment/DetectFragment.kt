@@ -11,9 +11,6 @@ import kr.puze.bluetooth.R
 
 class DetectFragment: Fragment() {
 
-    private var frameId: Int = 0
-    private var data = 100
-
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         val view: View = inflater.inflate(R.layout.fragment_detect, container, false)
         view.layout_detect.setOnClickListener {
@@ -24,6 +21,7 @@ class DetectFragment: Fragment() {
                 500 -> data = 100
             }
         }
+        changeView(view, data)
         return view
     }
 
@@ -37,13 +35,19 @@ class DetectFragment: Fragment() {
 
     fun changeView(view: View, data: Int){
         view.text_detect.text = "수치 : $data"
-        when(data){
-            in 0..200->{ view.layout_detect.setBackgroundColor(Color.BLUE) }
-            in 200..400->{ view.layout_detect.setBackgroundColor(Color.GREEN) }
-            else -> { view.layout_detect.setBackgroundColor(Color.RED) }
+        if(data == -1){
+            view.layout_detect.setBackgroundColor(Color.WHITE)
+        }else{
+            when(data){
+                in 0..200->{ view.layout_detect.setBackgroundColor(Color.BLUE) }
+                in 200..400->{ view.layout_detect.setBackgroundColor(Color.GREEN) }
+                else -> { view.layout_detect.setBackgroundColor(Color.RED) }
+            }
         }
     }
+
     companion object {
         fun newInstance(): DetectFragment = DetectFragment()
+        var data = -1
     }
 }

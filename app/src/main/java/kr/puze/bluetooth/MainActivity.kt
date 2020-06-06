@@ -9,6 +9,7 @@ import androidx.viewpager.widget.ViewPager
 import kotlinx.android.synthetic.main.activity_main.*
 import kr.puze.bluetooth.Fragment.MainPagerAdapter
 import com.google.android.material.tabs.TabLayout
+import kr.puze.bluetooth.Fragment.DetectFragment
 
 class MainActivity : AppCompatActivity() {
 
@@ -18,6 +19,7 @@ class MainActivity : AppCompatActivity() {
         private var viewPager: ViewPager? = null
         private var currentPage: Int = 0
         private var backKeyPressedTime: Long = 0L
+        var isBluetoothConnected = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,6 +75,11 @@ class MainActivity : AppCompatActivity() {
 
     fun goPage(index: Int){
         viewPager?.currentItem = index
+    }
+
+    fun changeBackground(data: Int){
+        DetectFragment.data = data
+        goPage(2)
     }
 
     private fun initTabLayout() {

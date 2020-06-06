@@ -2,6 +2,8 @@ package kr.puze.bluetooth.Fragment
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothSocket
 import android.bluetooth.le.BluetoothLeAdvertiser
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
@@ -9,6 +11,7 @@ import android.bluetooth.le.ScanResult
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -19,9 +22,11 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
 import kotlinx.android.synthetic.main.fragment_bluetooth.view.*
-import kr.puze.bluetooth.Beacon
-import kr.puze.bluetooth.BeaconAdapter
-import kr.puze.bluetooth.R
+import kr.puze.bluetooth.*
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
+import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -37,8 +42,12 @@ class BluetoothFragment : Fragment() {
     lateinit var mBluetoothLeAdvertiser: BluetoothLeAdvertiser
     lateinit var beacon: Vector<Beacon>
     lateinit var beaconAdapter: BeaconAdapter
-//    lateinit var mScanSettings: ScanSettings.Builder
-//    var scanFilters: ArrayList<ScanFilter> = ArrayList()
+    lateinit var pairedAdapter: PairedAdapter
+    lateinit var mDevices: Set<BluetoothDevice>
+    lateinit var mSocket: BluetoothSocket
+    lateinit var mOutputStream: OutputStream
+    lateinit var mInputStream: InputStream
+    lateinit var mWorkerThread: Thread
     var simpleDateFormat = SimpleDateFormat("HH:mm:ss", Locale.KOREAN)
 
     @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
@@ -46,21 +55,6 @@ class BluetoothFragment : Fragment() {
         val view: View = inflater.inflate(R.layout.fragment_bluetooth, container, false)
         thisView = view
         settingBluetooth(view)
-//        mScanSettings = ScanSettings.Builder()
-//        mScanSettings.setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-        // 얘는 스캔 주기를 2초로 줄여주는 Setting입니다.
-        // 공식문서에는 위 설정을 사용할 때는 다른 설정을 하지 말고
-        // 위 설정만 단독으로 사용하라고 되어 있네요 ^^
-        // 위 설정이 없으면 테스트해 본 결과 약 10초 주기로 스캔을 합니다.
-//        var scanSettings = mScanSettings.build()
-//        scanFilters = ArrayList(Vector())
-//        var scanFilter = ScanFilter.Builder()
-//        scanFilter.setDeviceAddress("특정 기기의 MAC 주소") //ex) 00:00:00:00:00:00
-//        var scan = scanFilter.build()
-//        scanFilters.add(scan)
-//        mBluetoothLeScanner.startScan(scanFilters.toList(), scanSettings, mScanCallback)
-
-        // filter와 settings 기능을 사용하지 않을 때는  처럼 사용하시면 돼요.
         return view
     }
 
@@ -82,6 +76,111 @@ class BluetoothFragment : Fragment() {
             beacon = Vector()
             mBluetoothLeScanner.startScan(getScanCallback(view))
         }
+
+        selectDevice(view)
+    }
+
+    fun selectDevice(view: View) {
+        mDevices = mBluetoothAdapter.bondedDevices;
+        var mPairedDeviceCount = mDevices.size
+
+        if(mPairedDeviceCount > 0){
+            // 페어링 된 블루투스 장치의 이름 목록 작성
+            var paring: Vector<Paired> = Vector()
+            for (device: BluetoothDevice in mDevices){
+                paring.add(Paired(device.name, device.address, device.uuids.toString()))
+                pairedAdapter = PairedAdapter(paring, layoutInflater)
+                view.list_bluetooth.adapter = beaconAdapter
+                view.list_bluetooth.onItemClickListener = OnItemClickListener { parent, view, position, id ->
+                    connectToSelectedDevice(paring[position].name)
+                }
+                beaconAdapter.notifyDataSetChanged()
+            }
+        }
+    }
+
+    fun getDeviceFromBondedList(name: String): BluetoothDevice? {
+        var selectedDevice: BluetoothDevice? = null
+
+        for (device: BluetoothDevice in mDevices){
+            if(name == device.name) {
+                selectedDevice = device
+                break;
+            }
+        }
+
+        return selectedDevice;
+    }
+
+    fun connectToSelectedDevice(selectedDeviceName: String) {
+        var mRemoteDevice = getDeviceFromBondedList(selectedDeviceName)
+        var uuid = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
+
+        if(mRemoteDevice != null){
+            try {
+                // 소켓 생성
+                mSocket = mRemoteDevice.createRfcommSocketToServiceRecord(uuid)
+                // RFCOMM 채널을 통한 연결
+                mSocket.connect();
+
+                // 데이터 송수신을 위한 스트림 열기
+                mOutputStream = mSocket.outputStream
+                mInputStream = mSocket.inputStream
+
+                // 데이터 수신 준비
+                beginListenForData()
+                Toast.makeText(activity, "블루투스 연결 성공!", Toast.LENGTH_SHORT).show()
+            }catch(e: Exception) {
+                // 블루투스 연결 중 오류 발생
+                Toast.makeText(activity, "블루투스 연결 실패!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun beginListenForData(){
+        var handler = Handler()
+
+        var readBuffer = ByteArray(1024) ;  //  수신 버퍼
+        var readBufferPositon = 0;        //   버퍼 내 수신 문자 저장 위치
+
+        mWorkerThread = Thread(Runnable {
+            while (!Thread.currentThread().isInterrupted){
+                try {
+                    var bytesAvailable = mInputStream.available()
+                    if(bytesAvailable > 0){
+                        var packetBytes = ByteArray(bytesAvailable)
+                        mInputStream.read(packetBytes)
+                        for(i in 0..bytesAvailable){
+                            var b = packetBytes[i]
+                            var a = "123"
+                            a += b
+                            if(b.equals('x')){
+                                var encodedBytes = ByteArray(readBufferPositon)
+                                System.arraycopy(readBuffer,0,encodedBytes,0,encodedBytes.size)
+                                var data = String(encodedBytes, Charset.forName("US-ASCII"))
+                                readBufferPositon = 0
+                                var result = 0
+                                for (i in readBuffer.indices) {
+                                    result = result or (readBuffer[i].toInt() shl 8 * i)
+                                }
+                                handler.post(Runnable {
+                                    Toast.makeText(this.activity!!, data, Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this.activity!!, result.toString(), Toast.LENGTH_SHORT).show()
+                                    //데이터가 수신되면 할 것
+                                })
+                            }else{
+                                readBuffer[readBufferPositon++] = b
+                            }
+                        }
+                    }
+                }catch (e: IOException){
+
+                }
+            }
+        })
+        mWorkerThread.start()
+
+        MainActivity.isBluetoothConnected = true
     }
     @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     fun getScanCallback(view: View): ScanCallback {
@@ -101,18 +200,21 @@ class BluetoothFragment : Fragment() {
                                 + "\n" + result.device.bondState + "\n" + result.device.type
                     )
                     activity!!.runOnUiThread {
-                        beacon.add(Beacon(result.device.address, result.rssi, simpleDateFormat.format(Date())))
+                        beacon.add(Beacon(result.device.address, result.rssi, simpleDateFormat.format(Date()), result.device))
                         beaconAdapter = BeaconAdapter(beacon, layoutInflater)
                         view.list_bluetooth.adapter = beaconAdapter
                         view.list_bluetooth.onItemClickListener =
                             OnItemClickListener { parent, view, position, id ->
-                                Toast.makeText(activity, "블루투스 연결 성공!", Toast.LENGTH_SHORT).show()
+                                try {
+                                    beacon[position].device.createBond()
+                                    Toast.makeText(activity, "블루투스 페어링 성공!", Toast.LENGTH_SHORT).show()
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                    Toast.makeText(activity, "블루투스 페어링 실패!", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         beaconAdapter.notifyDataSetChanged()
                     }
-//                    Thread(Runnable {
-//
-//                    }).start()
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -132,21 +234,18 @@ class BluetoothFragment : Fragment() {
         return mScanCallback
     }
 
-
-//    private fun setRecyclerView(view: View, items: ArrayList<String>) {
-//        var adapter = BluetoothRecyclerAdapter(items, this.activity!!)
-//        beaconListView!!.adapter = adapter
-//        adapter.notifyDataSetChanged()
-//        adapter.itemClick = object : BluetoothRecyclerAdapter.ItemClick {
-//            override fun onItemClick(view: View?, position: Int) {
-//            }
-//        }
-//    }
-
     @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     override fun onDestroy() {
         super.onDestroy()
         mBluetoothLeScanner.stopScan(mScanCallback)
+        try {
+          mWorkerThread.interrupt();   // 데이터 수신 쓰레드 종료
+          mInputStream.close();
+          mOutputStream.close();
+          mSocket.close();
+        } catch(e: Exception) {
+
+        }
     }
 
     companion object {
