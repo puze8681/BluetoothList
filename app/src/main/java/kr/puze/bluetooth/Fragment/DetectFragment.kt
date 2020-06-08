@@ -27,34 +27,42 @@ class DetectFragment : Fragment() {
         if(view != null){
             view.text_detect.text = "수치 : $data"
             if (data == -1) {
+                view.text_detect.text = "수치 : -"
                 view.layout_detect.setBackgroundColor(Color.WHITE)
             } else {
                 when (data) {
                     in 0..200 -> {
-                        view.layout_detect.setBackgroundColor(Color.BLUE)
+                        view.text_detect.text = "수치 : $data (안전)"
+                        view.layout_detect.setBackgroundColor(Color.parseColor("#536DFE"))
                     }
                     in 200..400 -> {
-                        view.layout_detect.setBackgroundColor(Color.GREEN)
+                        view.text_detect.text = "수치 : $data (주위)"
+                        view.layout_detect.setBackgroundColor(Color.parseColor("#4CAF50"))
                     }
                     else -> {
-                        view.layout_detect.setBackgroundColor(Color.RED)
+                        view.text_detect.text = "수치 : $data (위험)"
+                        view.layout_detect.setBackgroundColor(Color.parseColor("#E91E63"))
                     }
                 }
             }
         }else if(thisView != null){
             thisView.text_detect.text = "수치 : $data"
             if (data == -1) {
+                thisView.text_detect.text = "수치 : -"
                 thisView.layout_detect.setBackgroundColor(Color.WHITE)
             } else {
                 when (data) {
                     in 0..200 -> {
-                        thisView.layout_detect.setBackgroundColor(Color.BLUE)
+                        thisView.text_detect.text = "수치 : $data (안전)"
+                        thisView.layout_detect.setBackgroundColor(Color.parseColor("#536DFE"))
                     }
                     in 200..400 -> {
-                        thisView.layout_detect.setBackgroundColor(Color.GREEN)
+                        thisView.text_detect.text = "수치 : $data (주위)"
+                        thisView.layout_detect.setBackgroundColor(Color.parseColor("#4CAF50"))
                     }
                     else -> {
-                        thisView.layout_detect.setBackgroundColor(Color.RED)
+                        thisView.text_detect.text = "수치 : $data (위험)"
+                        thisView.layout_detect.setBackgroundColor(Color.parseColor("#E91E63"))
                     }
                 }
             }
