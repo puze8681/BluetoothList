@@ -155,7 +155,17 @@ class BluetoothFragment : Fragment() {
         }
     }
 
-    fun beginListenForData(){
+    fun sendDataToBluetooth(input: String){
+        val msgBuffer = input.toByteArray()
+        try {
+            mOutputStream.write(msgBuffer)
+        } catch (e: IOException) {
+            Toast.makeText(this.activity, "Connection Failure", Toast.LENGTH_LONG).show()
+        }
+    }
+
+
+    private fun beginListenForData(){
         var handler = Handler()
 
         mWorkerThread = Thread(Runnable {
@@ -175,6 +185,7 @@ class BluetoothFragment : Fragment() {
                                     handler.post(Runnable {
                                         Toast.makeText(this.activity!!, result, Toast.LENGTH_SHORT).show()
                                         DetectFragment().changeView(null, result.toInt())
+                                        sendDataToBluetooth(result)
                                         result = ""
                                         //데이터가 수신되면 할 것
                                     })
